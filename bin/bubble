@@ -1,0 +1,13 @@
+#!/bin/bash
+
+source $HOME/BuBBLE/bin/files.sh
+
+function bubble ()
+{
+    if [[ $1 = "repl" ]]
+    then 
+        exec $HOME/BuBBLE/bin/repl
+    fi
+}
+
+bubble $1 $2 

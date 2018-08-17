@@ -1,0 +1,24 @@
+#!/bin/bash
+
+function init ()
+{
+    if  ! grep -q "#Setting PATH for BuBBLE" $HOME/.bash_profile
+    then
+        echo "No PATH variable detected"
+        echo "Setting PATH..."
+        echo >> $HOME/.bash_profile
+        echo "#Setting PATH for BuBBLE" >> $HOME/.bash_profile
+        echo "PATH=\"\$PATH:\$HOME/BuBBLE/bin\"" >> $HOME/.bash_profile
+        echo "export PATH" >> $HOME/.bash_profile
+    fi 
+
+    cd $HOME 
+    if [ ! -d "BuBBLE" ]
+    then
+        mkdir BuBBLE
+        cd BuBBLE
+        git https://github.com/Ninjacop/BuBBLE.git
+    fi
+}
+
+init

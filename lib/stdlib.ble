@@ -1,0 +1,49 @@
+(defn caar (pair) (car (car pair)))
+(defn cadr (pair) (car (cdr pair)))
+(defn cdar (pair) (cdr (car pair)))
+(defn cddr (pair) (cdr (cdr pair)))
+
+
+(defn caaar (pair) (car (car (car pair))))
+(defn caadr (pair) (car (car (cdr pair))))
+(defn cadar (pair) (car (cdr (car pair))))
+(defn caddr (pair) (car (cdr (cdr pair))))
+(defn cdaar (pair) (cdr (car (car pair))))
+(defn cdadr (pair) (cdr (car (cdr pair))))
+(defn cddar (pair) (cdr (cdr (car pair))))
+(defn cdddr (pair) (cdr (cdr (cdr pair))))
+
+
+(defn caaaar (pair) (car (car (car (car pair)))))
+(defn caaadr (pair) (car (car (car (cdr pair)))))
+(defn caadar (pair) (car (car (cdr (car pair)))))
+(defn caaddr (pair) (car (car (cdr (cdr pair)))))
+(defn cadaar (pair) (car (cdr (car (car pair)))))
+(defn cadadr (pair) (car (cdr (car (cdr pair)))))
+(defn caddar (pair) (car (cdr (cdr (car pair)))))
+(defn cadddr (pair) (car (cdr (cdr (cdr pair)))))
+(defn cdaaar (pair) (cdr (car (car (car pair)))))
+(defn cdaadr (pair) (cdr (car (car (cdr pair)))))
+(defn cdadar (pair) (cdr (car (cdr (car pair)))))
+(defn cdaddr (pair) (cdr (car (cdr (cdr pair)))))
+(defn cddaar (pair) (cdr (cdr (car (car pair)))))
+(defn cddadr (pair) (cdr (cdr (car (cdr pair)))))
+(defn cdddar (pair) (cdr (cdr (cdr (car pair)))))
+(defn cddddr (pair) (cdr (cdr (cdr (cdr pair)))))
+
+(defn odd? (num) (eq (mod num 2) 1))
+(defn add? (num) (eq (mod num 2) 0))
+
+
+(defn find (x lst)
+    (if (not (list? lst))
+        #f
+        (if (equal (car lst) x)
+            #t    
+            (find x (cdr lst)))))
+
+(defn nth (lst n)
+    (if (eq n 0)
+        (car lst)
+        (nth (cdr lst) (- n 1)))) 
+
