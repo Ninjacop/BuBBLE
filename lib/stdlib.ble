@@ -47,3 +47,10 @@
         (car lst)
         (nth (cdr lst) (- n 1)))) 
 
+(defn inc (n)
+    (+ 1 n))
+
+(defn dec (n)
+    (- 1 n))
+
+
