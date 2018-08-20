@@ -24,7 +24,6 @@ import Numeric (readOct, readHex)
 import Text.ParserCombinators.Parsec hiding (spaces)
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Language
-import qualified Text.ParserCombinators.Parsec.Token as Token
 import System.Environment
 import System.Console.ANSI
 import System.Random
@@ -95,7 +94,7 @@ readOrThrow parser input = case parse parser "BuBBLE" input of
     Right val -> return val
 
 
--- readExpr :: String -> ThrowsError Values
+readExpr :: String -> ThrowsError Values
 readExpr = readOrThrow parseExpr
 readExprList = readOrThrow (endBy parseExpr spaces)
 
@@ -351,16 +350,22 @@ showError (Parser parseErr) = "Parser error at " ++ show parseErr
 
 -- Show functions
 showVal :: Values -> String
-showVal (String s) = "\"" ++ s ++ "\""
+-- Use the first string showVal if stuff gets in the way
+-- showVal (String s) = "\"" ++ s ++ "\""
+showVal (String s) = s
 showVal (Atom name) = name
 showVal (Number n) = show n
 showVal (Bool True) = "true"
 showVal (Bool False) = "false"
 showVal (List xs) = "(" ++ unwordsList xs ++ ")"
---showVal (Vector elems) = "#(" ++ unwordsList elems ++ ")"
+--showVal (Vector v) = "{" ++ unwordsList v ++ "}"
 showVal (DottedList head tail) = "(" ++ unwordsList head ++ " . " ++ showVal tail ++ ")"
 showVal (Char c) = ['\'', c, '\'']
 showVal (PrimitiveFunc _) = "<primitive>"
+showVal (Float f) = show f
+showVal (Complex i) = show i 
+showVal (Ratio r) = show r
+
 
 -- This is what prints after 
 showVal (Func {params=args, vararg=varargs, body=body, closure=env}) =
@@ -370,8 +375,8 @@ showVal (Func {params=args, vararg=varargs, body=body, closure=env}) =
             Just arg -> " . " ++ arg) ++ ") ...)"
 
 
-showVal (Port _) = "<IO port>"
-showVal (IOFunc _) = "<IO primitive>"
+showVal (Port _) = "<port>"
+showVal (IOFunc _) = "<primitive>"
 
 
 unwordsList :: [Values] -> String
@@ -405,6 +410,9 @@ eval env val@(String _) = return val
 eval env val@(Char _) = return val
 eval env val@(Number _) = return val
 eval env val@(Bool _) = return val
+eval env val@(Float _) = return val
+eval env val@(Complex _) = return val
+eval env val@(Ratio _) = return val
 eval env (Atom id) = getVar env id
 eval env (List [Atom "quote", val]) = return val
 
@@ -598,13 +606,16 @@ primitives :: [(String, [Values] -> ThrowsError Values)]
 primitives = [("+", numericBinop (+))
              ,("-", numericBinop (-))
              ,("*", numericBinop (*))
+             ,("gcd", numericBinop gcd)
              ,("/", numericBinop div)
              ,("mod", numericBinop mod)
              ,("quot", numericBinop quot)
              ,("rem", numericBinop rem)
+             ,("max", numericBinop max)
+             ,("min", numericBinop min)
              ,("eq", numBoolBinop (==))
-             ,("gt", numBoolBinop (<))
-             ,("lt", numBoolBinop (>))
+             ,("lt", numBoolBinop (<))
+             ,("gt", numBoolBinop (>))
              ,("not=", numBoolBinop (/=))
              ,("gte", numBoolBinop (>=))
              ,("lte", numBoolBinop (<=))
@@ -637,7 +648,7 @@ primitives = [("+", numericBinop (+))
              ,("car", car)
              ,("cdr", cdr)
              ,("cons", cons)
-             ,("eqv", eqv)
+             ,("eq", eqv)
              ,("equal", equal)
              ,("coll", make_string)
              ,("string", create_string)
@@ -645,7 +656,7 @@ primitives = [("+", numericBinop (+))
              ,("find", char_at)
              ,("substring", substring)
              ,("concat", string_append)
-             ,("print", printf)
+             ,("print", princ)
              ]
 
 
@@ -699,15 +710,14 @@ readAll [String filename] = liftM List $ load filename
 ci_help :: (String -> String -> Bool) -> String -> String -> Bool
 ci_help f a b = f (map toLower a) (map toLower b)
 
-
-printf :: [Values] -> ThrowsError Values
-printf [Number x] = return $ Number x 
-printf [Float x] = return $ Float x
-printf [String x] = return $ String x
-printf [List x] = return $ List x
-printf [DottedList (x) y] = return $ (DottedList x y)
-printf [Ratio x] = return $ Ratio x
-printf [Complex x] = return $ Complex x
+princ :: [Values] -> ThrowsError Values
+princ [Number x] = return $ Number x 
+princ [Float x] = return $ Float x
+princ [Ratio x] = return $ Ratio x 
+princ [Complex x] = return $ Complex x
+princ [String x] = return $ String x
+princ [List x] = return $ List x
+princ [DottedList (x) y] = return $ (DottedList x y)
 
 
 car :: [Values] -> ThrowsError Values
@@ -901,6 +911,3 @@ primitiveBindings = nullEnv >>= (flip bindVars $ map (makeFunc IOFunc) ioPrimiti
 makeFunc varargs env params body = return $ Func (map showVal params) varargs body env
 makeNormalFunc = makeFunc Nothing
 makeVarargs = makeFunc . Just . showVal
-
-
-------------- My Configurations -------------
