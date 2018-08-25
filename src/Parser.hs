@@ -389,7 +389,7 @@ showVal (Ratio r) = show r
 
 -- This is what prints after 
 showVal (Func {params=args, vararg=varargs, body=body, closure=env}) =
-    "(lambda (" ++ unwords (map show args) ++
+    "(use (" ++ unwords (map show args) ++
       (case varargs of
             Nothing -> ""
             Just arg -> " . " ++ arg) ++ ") ...)"
@@ -444,8 +444,22 @@ eval env (List [Atom "if", pred, conseq, alt]) = do
         Bool True -> eval env conseq
         otherwise  -> throwError $ TypeMismatch "boolean" result 
 
-eval env (List (Atom "cond" : [])) = throwError ExpectCondClauses
-eval env (List (Atom "cond" : cs)) = evalConds env cs
+eval env (List (Atom "cond" : expr : rest)) = do
+    eval' expr rest
+    where eval' (List [cond, value]) (x : xs) = do
+              result <- eval env cond
+              case result of
+                   Bool False -> eval' x xs
+                   Bool True  -> eval env value
+                   otherwise  -> throwError $ TypeMismatch "boolean" cond
+          eval' (List [Atom "else", value]) [] = do
+               eval env value
+          eval' (List [cond, value]) [] = do
+              result <- eval env cond
+              case result of
+                   Bool True  -> eval env value
+                   otherwise  -> throwError $ TypeMismatch "boolean" cond
+
 eval env (List (Atom "case" : [])) = throwError ExpectCaseClauses
 
 
@@ -469,19 +483,19 @@ eval env (List (Atom "defn" : Atom var : List (params) : body)) =
 eval env (List (Atom "defn" : Atom var : DottedList params varargs : body)) =
     makeVarargs varargs env params body  >>= defineVar env var
 
--- Lambda function
-eval env (List (Atom "lambda" : List params : body)) =
+-- Lambda function using a regular list
+eval env (List (Atom "use" : List params : body)) =
     makeNormalFunc env params body
 
-
-eval env (List (Atom "lambda" : DottedList params varargs : body)) =
+-- Lambda function using a dotted list
+eval env (List (Atom "use" : DottedList params varargs : body)) =
     makeVarargs varargs env params body
 
-
-eval env (List (Atom "lambda" : varargs@(Atom _) : body)) =
+-- Lambda function using one parameter without a list
+eval env (List (Atom "use" : varargs@(Atom _) : body)) =
     makeVarargs varargs env [] body
 
-
+-- Load a file with any extension, as long as it has correct grammar 
 eval env (List [Atom "load", String filename]) =
     load filename >>= liftM last . mapM (eval env)
 
@@ -491,32 +505,11 @@ eval env (List (function : args)) = do
     argVals <- mapM (eval env) args
     apply func argVals
 
-
+-- This evaluates when the function/expression has has an unrecognized special form
 eval env badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
 
 -- Evaluator Helpers
-evalConds :: Env -> [Values] -> IOThrowsError Values
-evalConds env (List (Atom "else" : xs) : []) = evalCondElse env xs
-evalConds _ [] = throwError ExpectCondClauses
-evalConds env (List clause : cs) = evalCondClause env clause cs
-evalConds _ badClauses = throwError $ TypeMismatch "cond clauses" $ List badClauses
-
-evalCondClause env (test : xs) rest = do
-    result <- eval env test
-    case test of
-         Bool False -> evalConds env rest
-         Bool True -> trueDo xs
-         otherwise -> throwError $ TypeMismatch "boolean" result
-  where 
-    trueDo [] = return $ Bool True
-    trueDo xs = evalToLast env xs
-
-
-evalCondElse :: Env -> [Values] -> IOThrowsError Values
-evalCondElse _ [] = throwError ExpectCondClauses
-evalCondElse env xs = evalToLast env xs
-
 
 evalCaseCases :: Env -> Values -> [Values] -> IOThrowsError Values
 evalCaseCases _ _ [] = throwError ExpectCaseClauses
@@ -682,8 +675,7 @@ ioPrimitives :: [(String, [Values] -> IOThrowsError Values)]
 ioPrimitives = [("apply", applyProc)
                ,("openinput", makePort ReadMode)
                ,("openoutput", makePort WriteMode)
-               ,("closeinput", closePort)
-               ,("closeoutput", closePort)
+               ,("close", closePort)
                ,("read", readProc)
                ,("write", writeProc)
                ,("readcontents", readContents)
