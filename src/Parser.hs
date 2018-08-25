@@ -1,4 +1,8 @@
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DataKinds #-}
+
 module Parser where
 
 -- Errors
@@ -14,6 +18,9 @@ import Control.Monad.Except
 import Control.Monad.Trans.Except
 import Control.Monad.Error
 import Control.Monad.Fix
+import Control.Monad.Identity
+import Control.Monad.Reader
+import Control.Concurrent (threadDelay)
 import Data.Array (Array (..), listArray)
 import Data.Char (toLower)
 import Data.Complex (Complex (..))
@@ -25,12 +32,10 @@ import Text.ParserCombinators.Parsec hiding (spaces)
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Language
 import System.Environment
-import System.Console.ANSI
-import System.Random
 import System.IO 
-
-
-
+import System.Process
+import System.Exit (ExitCode (..))
+import System.Posix.Unistd
 
 
 -- Datatypes & Errors
@@ -38,6 +43,8 @@ data Values = Atom String
              | List [Values]
              | DottedList [Values] Values
              | Number Integer
+             | InOut (IO ())
+             | InOutNum (IO Int)
              | Ratio Rational
              | Float Double
              | Complex (Complex Double)
@@ -78,9 +85,8 @@ instance Error BubbleError where
 
 
 type ThrowsError = Either BubbleError
-type Env = IORef [(String, IORef Values)]
+type Env = IORef [(String, IORef Values)] 
 type IOThrowsError = ErrorT BubbleError IO
-
 
 
 data Unpacker = forall a. Eq a => AnyUnpacker (Values -> ThrowsError a)
@@ -114,7 +120,9 @@ runRepl = primitiveBindings >>= until_ (== ":q") (readPrompt "Bubble> ") . evalA
 
 -- Value Parsing
 parseExpr :: Parser Values
-parseExpr = parseAtom
+parseExpr = do 
+          skipMany (comments <|> spaces)
+          parseAtom
           <|> parseString
           <|> try parseChar
           <|> try parseComplex
@@ -128,6 +136,18 @@ parseExpr = parseAtom
           <|> parseUnquote
           <|> parseList
           <|> parseVector
+
+
+comments :: Parser ()
+comments = skipMany1 (blockComment <|> inlineComment)
+
+
+inlineComment :: Parser String
+inlineComment = try $ string ";" >> manyTill anyChar (try newline)
+
+
+blockComment :: Parser String
+blockComment = try $ string "--" >> manyTill (anyChar <|> newline) (try (string "--"))
 
 
 parseAtom :: Parser Values
@@ -404,7 +424,7 @@ extractValue :: ThrowsError a -> a
 extractValue (Right val) = val
 
 
--- Evaluator
+-- Evaluator 
 eval :: Env -> Values -> IOThrowsError Values
 eval env val@(String _) = return val
 eval env val@(Char _) = return val
@@ -422,19 +442,16 @@ eval env (List [Atom "if", pred, conseq, alt]) = do
     case result of
         Bool False -> eval env alt
         Bool True -> eval env conseq
-        otherwise  -> throwError $ TypeMismatch "boolean" result
-
+        otherwise  -> throwError $ TypeMismatch "boolean" result 
 
 eval env (List (Atom "cond" : [])) = throwError ExpectCondClauses
 eval env (List (Atom "cond" : cs)) = evalConds env cs
 eval env (List (Atom "case" : [])) = throwError ExpectCaseClauses
 
 
-
 eval env (List (Atom "case" : key : cs)) = do
     keyVal <- eval env key
     evalCaseCases env keyVal cs
-
 
 -- This is like swap! in clojure
 eval env (List [Atom "set!", Atom var, form]) = 
@@ -484,7 +501,6 @@ evalConds env (List (Atom "else" : xs) : []) = evalCondElse env xs
 evalConds _ [] = throwError ExpectCondClauses
 evalConds env (List clause : cs) = evalCondClause env clause cs
 evalConds _ badClauses = throwError $ TypeMismatch "cond clauses" $ List badClauses
-
 
 evalCondClause env (test : xs) rest = do
     result <- eval env test
@@ -601,12 +617,13 @@ trapError action = catchError action (return . show)
 
 
 -- Primitive functions lookup table
---
+
 primitives :: [(String, [Values] -> ThrowsError Values)]
-primitives = [("+", numericBinop (+))
+primitives = [("+", numericBinop (+)) 
              ,("-", numericBinop (-))
              ,("*", numericBinop (*))
              ,("gcd", numericBinop gcd)
+             ,("lcm", numericBinop lcm)
              ,("/", numericBinop div)
              ,("mod", numericBinop mod)
              ,("quot", numericBinop quot)
@@ -631,7 +648,7 @@ primitives = [("+", numericBinop (+))
              ,("char?gt", charBoolBinop (>))
              ,("char?lte", charBoolBinop (<=))
              ,("char?gte", charBoolBinop (>=))
-             ,("string-ci?eq", strBoolBinop (ci_help (==)))
+             ,("string-ci?eq", strBoolBinop (ci_help (==))) -- ci means Case Insensitive
              ,("string-ci?lt", strBoolBinop (ci_help (<)))
              ,("string-ci?gt", strBoolBinop (ci_help (>)))
              ,("string-ci?lte", strBoolBinop (ci_help (<=)))
@@ -650,17 +667,16 @@ primitives = [("+", numericBinop (+))
              ,("cons", cons)
              ,("eq", eqv)
              ,("equal", equal)
-             ,("coll", make_string)
-             ,("string", create_string)
-             ,("length", string_length)
-             ,("find", char_at)
-             ,("substring", substring)
-             ,("concat", string_append)
-             ,("print", princ)
-             ]
+             ,("coll", make_string) -- (coll 5 #\r) -> rrrrr
+             ,("string", create_string) -- (string #\a #\h) -> ah
+             ,("length", string_length) 
+             ,("find", char_at) -- (find "asdg" 3) -> 'g'
+             ,("substring", substring) -- (substring "hello" 0 3) -> hel
+             ,("concat", string_append) -- (concat "hello" "world") -> helloworld
+             ,("print", princ)]
 
 
--- IO Primitives
+-- IO Primitives - openinput/openoutput has to be set to a variable: (def x (openoutput "somefile"))
 --
 ioPrimitives :: [(String, [Values] -> IOThrowsError Values)]
 ioPrimitives = [("apply", applyProc)
@@ -718,7 +734,6 @@ princ [Complex x] = return $ Complex x
 princ [String x] = return $ String x
 princ [List x] = return $ List x
 princ [DottedList (x) y] = return $ (DottedList x y)
-
 
 car :: [Values] -> ThrowsError Values
 car [List (x:xs)] = return x 
@@ -815,7 +830,8 @@ string_append ss
     | otherwise = throwError $ TypeMismatch "list of string" $ List ss
   where
     isString (String _) = True
-    isString _ = False 
+    isString _ = False
+
 
 --
 -- Primitive helpers
@@ -908,6 +924,15 @@ primitiveBindings = nullEnv >>= (flip bindVars $ map (makeFunc IOFunc) ioPrimiti
                                               ++ map (makeFunc PrimitiveFunc) primitives)
   where makeFunc constructor (var, func) = (var, constructor func)
 
-makeFunc varargs env params body = return $ Func (map showVal params) varargs body env
+makeFunc varargs env params body = return $ Func (map showVal  params) varargs body env
 makeNormalFunc = makeFunc Nothing
-makeVarargs = makeFunc . Just . showVal
+makeVarargs = makeFunc . Just . showVal  
+
+
+-- 
+-- Haskell-esque funcs that aren't allowed by any other function - I needed to add a datatype for IO as well
+--
+
+-- lol there's nothing here yet
+
+
