@@ -1,5 +1,6 @@
 # BuBBLE
 
+[Logo](https://github.com/Ninjacop123/BuBBLE/Bubble.png)
 
 ## Installation - Tested on Intel Mac, but I Think It Runs on Certain Linux OSes 
     
