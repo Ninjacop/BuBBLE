@@ -38,7 +38,7 @@ which downloads library "x" from [bubblestand], and installs it into BuBBLE/bin
       
 ## Examples  
       
-See the wiki for examples/tutorials
+See the [wiki](https://github.com/Ninjacop/BuBBLE/wiki) for examples/tutorials
       
 ## Bugs  
       
