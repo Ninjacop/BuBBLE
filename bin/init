@@ -17,7 +17,12 @@ function init ()
     then
         mkdir BuBBLE
         cd BuBBLE
-        git https://github.com/Ninjacop/BuBBLE.git
+        git clone https://github.com/Ninjacop/BuBBLE.git
+        echo "" 
+        echo ""
+        echo "BuBBLE was installed at " $HOME " -- if you have downloaded/moved a previous BuBBLE installment to another location, you will have to run the REPL manually, as \`bubble repl\` will run the REPL located on " $HOME
+        echo ""
+        echo ""
     fi
 }
 
