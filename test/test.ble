@@ -1,3 +1,7 @@
+:= this has not been updated since 0.1.0, feel free to modify it, but remember that
+   the syntax is wrong =: 
+
+
 (defn flip ((func) (arg1 arg2)) (func arg2 arg1))
 
 (defn curry (lambda (func arg1) (arg2)) (func arg1 arg2))
@@ -27,20 +31,6 @@
     (fold f a l))
 
 
-(defn max (x  num-list) 
-    (fold (y z) (if (> y z) y z)) 
-                    x 
-                    (cons 0 num-list))
-
-(defn min (x  num-list) 
-    (fold (y z) (if (< y z) y z)) 
-                    x 
-                    (cons 536870911 num-list))
-
-
-(defn length (lst)        
-    (fold (x y) (+ x 1)) 0 lst)
-
 (defn append (lst lsts)  
     (foldr (flip (curry foldr cons)) lst lsts))
 
@@ -66,11 +56,6 @@
 
 (defn assoc (obj alist)   
     (fold (mem-helper (curry equal? obj) car) #f alist))
-
-
-(defn map (func lst)     
-    (foldr (x y) (cons (func x) y)) '() lst)
-
 
 
 (load "/Users/Ninjacop123/BuBBLE/lib/stdlib.ble")
