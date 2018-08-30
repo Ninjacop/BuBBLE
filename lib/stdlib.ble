@@ -31,11 +31,7 @@
 (defn cdddar (pair) (cdr (cdr (cdr (car pair)))))
 (defn cddddr (pair) (cdr (cdr (cdr (cdr pair)))))
 
-(defn odd? (num) (eq (mod num 2) 1))
-(defn add? (num) (eq (mod num 2) 0))
-
-
-(defn find (x lst)
+(defn inlist? (x lst)
     (if (not (list? lst))
         #f
         (if (equal (car lst) x)
