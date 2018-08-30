@@ -1,9 +1,13 @@
 module Main where
 
-import Parser
+-- This imports `Parser.hs`, `Primitives.hs` and `Types.hs` because Primitives imports Parser and Parser imports Types
+import Primitives
+
+-- Needed for the function `clearScreen`
 import System.Console.ANSI
 import System.Environment
 
+-- Just a general heading that happens at REPL start-up, and is easier to make a function here than to put this all in `main`
 welcomeScreen :: IO ()
 welcomeScreen = do
     clearScreen
@@ -24,6 +28,7 @@ welcomeScreen = do
     putStrLn "" 
 
 
+-- The, main, the myth, the legend
 main :: IO ()
 main = do
    args <- getArgs
@@ -35,4 +40,4 @@ main = do
 
 
 
--- functions are weird
+-- functions are weird coming from Lisp
